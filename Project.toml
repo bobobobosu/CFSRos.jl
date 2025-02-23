@@ -1,0 +1,11 @@
+name = "CFSRos"
+uuid = "38ba9065-c696-4fc1-9a57-0c3d20bbeaf0"
+authors = ["bobobobosu <bobobobosu@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+BoTrajOpt = "32dd75fc-e3d1-4e87-b4da-0bc97ceec867"
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
+
+[compat]
+BoTrajOpt = "0.1.0"
