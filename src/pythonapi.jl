@@ -195,6 +195,7 @@ function plan_motion_cart(
     end
 
     qidx = configidx(setup.model, setup.dof_joints)
+    println(upsample_pths)
     trajj = let
         trajj = [pthcart[1]]
         map(x -> append!(trajj, x[2:end]), upsample_pths)
