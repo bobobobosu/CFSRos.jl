@@ -203,6 +203,8 @@ function plan_motion_cart(
     ts = let
         vel_limit = dyn_constr[2] .|> x -> minimum(abs.(x))
         dts = diff(trajj) .|> x -> max(1.0e-3, maximum(abs.(x[qidx]) ./ vel_limit))
+        println("dts")
+        println(dts)
         range(0.0, sum(dts), length=length(trajj)) |> collect
     end
     target_fs = let
