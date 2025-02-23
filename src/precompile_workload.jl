@@ -2,10 +2,10 @@
 using .CFSRos: robotsetup_setup, plan_motion_cart, plan_motion_joint
 using BoTrajOpt.Serialization
 
-module_path = dirname(@__FILE__)
-setup = robotsetup_setup(joinpath(module_path, "test.urdf"))
-plan_motion_cart_req = deserialize(joinpath(module_path, "plan_motion_cart.jld2"))
-plan_motion_joint_req = deserialize(joinpath(module_path, "plan_motion_joint.jld2"))
+precompile_path = joinpath(dirname(@__FILE__), "..", "precompile")
+setup = robotsetup_setup(joinpath(precompile_path, "test.urdf"))
+plan_motion_cart_req = deserialize(joinpath(precompile_path, "plan_motion_cart.jld2"))
+plan_motion_joint_req = deserialize(joinpath(precompile_path, "plan_motion_joint.jld2"))
 
 plan_motion_cart(
     setup,
