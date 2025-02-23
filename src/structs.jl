@@ -1,11 +1,11 @@
-using BoTrajOpt.RigidBodyDynamics
-using BoTrajOpt.MechanismGeometries
-using BoTrajOpt.GeometryBasics
-using BoTrajOpt.StaticArrays
-using BoTrajOpt.SparseArrays
-using BoTrajOpt.LazySets
-using BoTrajOpt.RigidBodyDynamics: StateCache, WrenchesCache
-using BoTrajOpt: RobotCaches
+using CFSTrajOpt.RigidBodyDynamics
+using CFSTrajOpt.MechanismGeometries
+using CFSTrajOpt.GeometryBasics
+using CFSTrajOpt.StaticArrays
+using CFSTrajOpt.SparseArrays
+using CFSTrajOpt.LazySets
+using CFSTrajOpt.RigidBodyDynamics: StateCache, WrenchesCache
+using CFSTrajOpt: RobotCaches
 
 # RobotSetup
 struct RobotSetup{T,D}

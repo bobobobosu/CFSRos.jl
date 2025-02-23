@@ -1,13 +1,13 @@
-using BoTrajOpt.Clarabel
-using BoTrajOpt.JuMP
-using BoTrajOpt.StaticArrays
-using BoTrajOpt.RigidBodyDynamics
-using BoTrajOpt.Rotations
-using BoTrajOpt: t3d2posang, t3d2allposang, t3d2posxdir, t3d2posydir, t3d2poszdir, velocityidx, packvecs, set_velocities!, set_configurations!, configidx
-using BoTrajOpt: cfstrajkinsetup!, cfstrajdynsetup!, cfstrajkinodynsetup!, cfschecktrajj, update_ys!, update_d0s_dgrads!
-using BoTrajOpt: Trajectory
-using BoTrajOpt.TimerOutputs
-using BoTrajOpt: to
+using CFSTrajOpt.Clarabel
+using CFSTrajOpt.JuMP
+using CFSTrajOpt.StaticArrays
+using CFSTrajOpt.RigidBodyDynamics
+using CFSTrajOpt.Rotations
+using CFSTrajOpt: t3d2posang, t3d2allposang, t3d2posxdir, t3d2posydir, t3d2poszdir, velocityidx, packvecs, set_velocities!, set_configurations!, configidx
+using CFSTrajOpt: cfstrajkinsetup!, cfstrajdynsetup!, cfstrajkinodynsetup!, cfschecktrajj, update_ys!, update_d0s_dgrads!
+using CFSTrajOpt: Trajectory
+using CFSTrajOpt.TimerOutputs
+using CFSTrajOpt: to
 
 function validate_motion(
     caches::RobotCaches,

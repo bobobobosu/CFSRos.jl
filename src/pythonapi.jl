@@ -1,10 +1,10 @@
-using BoTrajOpt.RigidBodyDynamics
-using BoTrajOpt.StaticArrays
-using BoTrajOpt.KernelAbstractions
-using BoTrajOpt: set_configurations!, t3d2posang, RobotCaches, RigidBodyCaches, MeshGraphCaches, rrtcfscart, distgoalf, t3d2poszdir, rrtcfsjoint, configidx, Trajectory
-using BoTrajOpt.Rotations
-using BoTrajOpt.ForwardDiff
-using BoTrajOpt.Serialization
+using CFSTrajOpt.RigidBodyDynamics
+using CFSTrajOpt.StaticArrays
+using CFSTrajOpt.KernelAbstractions
+using CFSTrajOpt: set_configurations!, t3d2posang, RobotCaches, RigidBodyCaches, MeshGraphCaches, rrtcfscart, distgoalf, t3d2poszdir, rrtcfsjoint, configidx, Trajectory
+using CFSTrajOpt.Rotations
+using CFSTrajOpt.ForwardDiff
+using CFSTrajOpt.Serialization
 
 function plan_motion_joint(
     setup::RobotSetup,

@@ -1,6 +1,6 @@
 # include("CFSRos.jl")
 using .CFSRos: robotsetup_setup, plan_motion_cart, plan_motion_joint
-using BoTrajOpt.Serialization
+using CFSTrajOpt.Serialization
 
 precompile_path = joinpath(dirname(@__FILE__), "..", "precompile")
 setup = robotsetup_setup(joinpath(precompile_path, "test.urdf"))

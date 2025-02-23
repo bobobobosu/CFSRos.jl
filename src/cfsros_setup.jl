@@ -1,14 +1,14 @@
-using BoTrajOpt: load_mesh_tuples, t3d2cfg, set_configurations!, meshgraph
+using CFSTrajOpt: load_mesh_tuples, t3d2cfg, set_configurations!, meshgraph
 
-using BoTrajOpt.RigidBodyDynamics
-using BoTrajOpt.MechanismGeometries
-using BoTrajOpt.GeometryBasics
-using BoTrajOpt.StaticArrays
-using BoTrajOpt.Rotations
-using BoTrajOpt.Serialization
-using BoTrajOpt.LazySets
-using BoTrajOpt: RobotCaches, MeshGraphCaches, RigidBodyCaches
-using BoTrajOpt.KernelAbstractions
+using CFSTrajOpt.RigidBodyDynamics
+using CFSTrajOpt.MechanismGeometries
+using CFSTrajOpt.GeometryBasics
+using CFSTrajOpt.StaticArrays
+using CFSTrajOpt.Rotations
+using CFSTrajOpt.Serialization
+using CFSTrajOpt.LazySets
+using CFSTrajOpt: RobotCaches, MeshGraphCaches, RigidBodyCaches
+using CFSTrajOpt.KernelAbstractions
 
 function robot_get_state(
     setup::RobotSetup,
