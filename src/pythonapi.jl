@@ -195,7 +195,6 @@ function plan_motion_cart(
     end
 
     qidx = configidx(setup.model, setup.dof_joints)
-    println(upsample_pths)
     trajj = let
         trajj = [pthcart[1]]
         map(x -> append!(trajj, x[2:end]), upsample_pths)
@@ -204,8 +203,6 @@ function plan_motion_cart(
     ts = let
         vel_limit = dyn_constr[2] .|> x -> minimum(abs.(x))
         dts = diff(trajj) .|> x -> max(1.0e-3, maximum(abs.(x[qidx]) ./ vel_limit))
-        println("dts")
-        println(dts)
         range(0.0, sum(dts), length=length(trajj)) |> collect
     end
     target_fs = let
