@@ -260,18 +260,8 @@ function plan_motion_cart_abs(
     goal_link_name,
     goal_pos,
     goal_ori,
+    safety_margin,
 )
-    # serialize(
-    #     "plan_motion_cart_abs.jld2",
-    #     Dict(
-    #         "start_joint_names" => String.(start_joint_names),
-    #         "start_joint_positions" => Float64.(start_joint_positions),
-    #         "frame_id" => String(frame_id),
-    #         "goal_link_name" => String(goal_link_name),
-    #         "goal_pos" => Float64.(goal_pos),
-    #         "goal_ori" => Float64.(goal_ori)
-    #     )
-    # )
     q = map(x ->
             start_joint_positions[findfirst(==(String(x)), start_joint_names)],
         (x -> x.name).(setup.dof_joints)
@@ -292,7 +282,6 @@ function plan_motion_cart_abs(
     meshgraphs = setup.meshgraphs_cvx
     collision_pairs = setup.collision_pairs
     dyn_constr = setup.dyn_constr
-    safety_margin = 0.0
 
     N = length(c)
     T = eltype(c)
