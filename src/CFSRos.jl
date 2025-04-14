@@ -9,7 +9,7 @@ using PrecompileTools: @setup_workload, @compile_workload
 
 @setup_workload begin
     @compile_workload begin
-        include("precompile_workload.jl")
+        # include("precompile_workload.jl")
     end
 end
 
