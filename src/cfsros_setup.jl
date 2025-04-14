@@ -30,7 +30,6 @@ function robot_get_state(
 end
 
 function robotsetup_setup(urdf_path::String, mode::Symbol=:left) # :left, :right, :both
-    urdf = basename(urdf_path)
     cd(dirname(urdf_path)) do
         urdf = basename(urdf_path)
         model = parse_urdf(urdf, remove_fixed_tree_joints=false)
@@ -41,12 +40,12 @@ function robotsetup_setup(urdf_path::String, mode::Symbol=:left) # :left, :right
                 (x.joint_type isa Prismatic), tree_joints(model)))
         dof_joints = Vector{Joint}(filter(x ->
                 x.joint_type isa Revolute, tree_joints(model)))
-        if mode == :left
-            dof_joints = filter(x -> occursin("left", x.name), dof_joints)
+        dof_joints = if mode == :left
+            filter(x -> occursin("left", x.name), dof_joints)
         elseif mode == :right
-            dof_joints = filter(x -> occursin("right", x.name), dof_joints)
+            filter(x -> occursin("right", x.name), dof_joints)
         elseif mode == :both
-            dof_joints = filter(x -> occursin("right", x.name) || occursin("left", x.name), dof_joints)
+            filter(x -> occursin("right", x.name) || occursin("left", x.name), dof_joints)
         else
             error("Invalid mode: $mode")
         end
