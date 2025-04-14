@@ -292,7 +292,7 @@ function plan_motion_cart_abs(
     meshgraphs = setup.meshgraphs_cvx
     collision_pairs = setup.collision_pairs
     dyn_constr = setup.dyn_constr
-    safety_margin = -1.0
+    safety_margin = 0.0
 
     N = length(c)
     T = eltype(c)
