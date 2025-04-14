@@ -1,4 +1,3 @@
-using LayoutOptimization: RobotSetup
 using CFSTrajOpt: load_mesh_tuples, t3d2cfg, set_configurations!, meshgraph
 
 using CFSTrajOpt.RigidBodyDynamics
