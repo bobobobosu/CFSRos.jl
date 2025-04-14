@@ -32,11 +32,11 @@ function plan_motion_joint(
             goal_joint_positions[findfirst(==(String(x)), goal_joint_names)],
         (x -> x.name).(setup.dof_joints)
     )
-    c_start = robot_get_state_g1(setup,
+    c_start = robot_get_state(setup,
         zeros(0),
         q_start
     ) |> configuration |> x -> SVector(x...)
-    c_goal = robot_get_state_g1(setup,
+    c_goal = robot_get_state(setup,
         zeros(0),
         q_goal
     ) |> configuration |> x -> SVector(x...)
@@ -136,7 +136,7 @@ function plan_motion_cart_rel(
             start_joint_positions[findfirst(==(String(x)), start_joint_names)],
         (x -> x.name).(setup.dof_joints)
     )
-    c = robot_get_state_g1(setup,
+    c = robot_get_state(setup,
         zeros(0),
         q
     ) |> configuration |> x -> SVector(x...)
@@ -276,7 +276,7 @@ function plan_motion_cart_abs(
             start_joint_positions[findfirst(==(String(x)), start_joint_names)],
         (x -> x.name).(setup.dof_joints)
     )
-    c = robot_get_state_g1(setup,
+    c = robot_get_state(setup,
         zeros(0),
         q
     ) |> configuration |> x -> SVector(x...)
