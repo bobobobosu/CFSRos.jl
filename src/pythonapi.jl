@@ -6,6 +6,8 @@ using CFSTrajOpt.Rotations
 using CFSTrajOpt.ForwardDiff
 using CFSTrajOpt.Serialization
 
+
+
 function plan_motion_joint(
     setup::RobotSetup,
     start_joint_names,
@@ -30,11 +32,14 @@ function plan_motion_joint(
             goal_joint_positions[findfirst(==(String(x)), goal_joint_names)],
         (x -> x.name).(setup.dof_joints)
     )
-    s = MechanismState(setup.model)
-    set_configurations!(s, setup.dof_joints, q_start)
-    c_start = s |> configuration |> x -> SVector(x...)
-    set_configurations!(s, setup.dof_joints, q_goal)
-    c_goal = s |> configuration |> x -> SVector(x...)
+    c_start = robot_get_state_g1(setup,
+        zeros(0),
+        q_start
+    ) |> configuration |> x -> SVector(x...)
+    c_goal = robot_get_state_g1(setup,
+        zeros(0),
+        q_goal
+    ) |> configuration |> x -> SVector(x...)
 
     caches = RobotCaches(
         [RigidBodyCaches(setup.model) for _ in 1:Threads.nthreads()],
@@ -44,7 +49,7 @@ function plan_motion_joint(
     meshgraphs = setup.meshgraphs_cvx
     collision_pairs = setup.collision_pairs
     dyn_constr = setup.dyn_constr
-    safety_margin = 0.001
+    safety_margin = 0.01
 
     N = length(c_start)
     T = eltype(c_start)
@@ -55,7 +60,7 @@ function plan_motion_joint(
         c_start,
         c_goal,
         meshgraphs,
-        collision_pairs[1:0],
+        collision_pairs,
         dyn_constr,
         safety_margin,
         0.1,
@@ -89,6 +94,7 @@ function plan_motion_joint(
         safety_margins,
         CPU()
     )
+    global trjy_gbl = trjy
 
     if length(trajj) > 2
         trjy = solve_cfsmotion(trjy)
@@ -105,7 +111,8 @@ function plan_motion_joint(
     ts, trajj
 end
 
-function plan_motion_cart(
+
+function plan_motion_cart_rel(
     setup::RobotSetup,
     start_joint_names,
     start_joint_positions,
@@ -129,9 +136,10 @@ function plan_motion_cart(
             start_joint_positions[findfirst(==(String(x)), start_joint_names)],
         (x -> x.name).(setup.dof_joints)
     )
-    s = MechanismState(setup.model)
-    set_configurations!(s, setup.dof_joints, q)
-    c = s |> configuration |> x -> SVector(x...)
+    c = robot_get_state_g1(setup,
+        zeros(0),
+        q
+    ) |> configuration |> x -> SVector(x...)
 
     target_f = (relative_transform(
             s,
@@ -152,7 +160,7 @@ function plan_motion_cart(
     meshgraphs = setup.meshgraphs_cvx
     collision_pairs = setup.collision_pairs
     dyn_constr = setup.dyn_constr
-    safety_margin = 0.001
+    safety_margin = 0.03
 
     N = length(c)
     T = eltype(c)
@@ -228,6 +236,139 @@ function plan_motion_cart(
         safety_margins,
         CPU()
     )
+
+    if length(trajj) > 2
+        trjy = solve_cfsmotion(trjy)
+    end
+
+    global trjy_gbl = trjy
+    ts = trjy.ts
+    trajj = let
+        ros_joints = (x -> findjoint(setup.model, String(x))).(start_joint_names)
+        qidx = configidx(setup.model, ros_joints)
+        reduce(hcat, (x -> x[qidx]).(trajj))
+    end
+    ts, trajj
+end
+
+function plan_motion_cart_abs(
+    setup::RobotSetup,
+    caches::RobotCaches,
+    start_joint_names,
+    start_joint_positions,
+    frame_id,
+    goal_link_name,
+    goal_pos,
+    goal_ori,
+)
+    # serialize(
+    #     "plan_motion_cart_abs.jld2",
+    #     Dict(
+    #         "start_joint_names" => String.(start_joint_names),
+    #         "start_joint_positions" => Float64.(start_joint_positions),
+    #         "frame_id" => String(frame_id),
+    #         "goal_link_name" => String(goal_link_name),
+    #         "goal_pos" => Float64.(goal_pos),
+    #         "goal_ori" => Float64.(goal_ori)
+    #     )
+    # )
+    q = map(x ->
+            start_joint_positions[findfirst(==(String(x)), start_joint_names)],
+        (x -> x.name).(setup.dof_joints)
+    )
+    c = robot_get_state_g1(setup,
+        zeros(0),
+        q
+    ) |> configuration |> x -> SVector(x...)
+
+    target_f = (Transform3D(
+            default_frame(findbody(setup.model, goal_link_name)),
+            default_frame(findbody(setup.model, frame_id)),
+            QuatRotation(goal_ori...),
+            SVector(goal_pos...)
+        ), :t3d2posang)
+
+    dof = setup.dof_joints
+    meshgraphs = setup.meshgraphs_cvx
+    collision_pairs = setup.collision_pairs
+    dyn_constr = setup.dyn_constr
+    safety_margin = 0.01
+
+    N = length(c)
+    T = eltype(c)
+
+    pthcart = rrtcfscart(
+        caches,
+        dof,
+        c,
+        target_f,
+        meshgraphs,
+        collision_pairs,
+        dyn_constr,
+        safety_margin,
+        1.0,
+        1.0e-4,
+        4000
+    )
+
+    # upsample
+    upsample_tasks = Vector{NTuple{2,SVector{N,T}}}()
+    for i in 2:lastindex(pthcart)
+        push!(upsample_tasks, (pthcart[i-1], pthcart[i]))
+    end
+
+    upsample_pths = Vector{Vector{SVector{N,T}}}(undef, length(upsample_tasks))
+    for i in 1:lastindex(upsample_tasks)
+        upsample_pths[i] = rrtcfsjoint(
+            caches,
+            dof,
+            first(upsample_tasks[i]),
+            last(upsample_tasks[i]),
+            meshgraphs,
+            collision_pairs,
+            dyn_constr,
+            safety_margin,
+            0.1,
+            1.0e-4,
+            4000
+        )
+    end
+
+    qidx = configidx(setup.model, setup.dof_joints)
+    trajj = let
+        trajj = [pthcart[1]]
+        map(x -> append!(trajj, x[2:end]), upsample_pths)
+        trajj
+    end
+    ts = let
+        vel_limit = dyn_constr[2] .|> x -> minimum(abs.(x))
+        dts = diff(trajj) .|> x -> max(1.0e-3, maximum(abs.(x[qidx]) ./ vel_limit))
+        range(0.0, max(10.0, sum(dts)), length=length(trajj)) |> collect
+    end
+    target_fs = let
+        target_fs = Vector{Union{Nothing,Tuple{Transform3D{T},Symbol}}}(nothing, length(trajj))
+        target_fs[end] = target_f
+        target_fs
+    end
+    target_cs = Vector{Union{Nothing,eltype(trajj)}}(nothing, length(trajj))
+    target_cs[1] = c
+    safety_margins = Vector{Union{Nothing,eltype(ts)}}(fill(safety_margin, length(trajj)))
+
+    @time trjy = Trajectory(
+        setup.model,
+        setup.dof_layouts,
+        setup.dof_joints,
+        setup.collision_pairs,
+        setup.dyn_constr,
+        setup.meshgraphs_cvx,
+        caches,
+        ts,
+        trajj,
+        target_fs,
+        target_cs,
+        safety_margins,
+    )
+    global trjy_gbl = trjy
 
     if length(trajj) > 2
         trjy = solve_cfsmotion(trjy)
