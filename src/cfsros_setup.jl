@@ -49,7 +49,8 @@ function robotsetup_setup(urdf_path::String, mode::Symbol=:left) # :left, :right
         else
             error("Invalid mode: $mode")
         end
-        println(dof_joints)
+        dof_joints = filter(x -> any(map(y -> occursin(y, x.name),
+                ["shoulder", "elbow", "wrist"])), dof_joints)
         dyn_constr = let
             pos = SVector((dof_joints |>
                            x -> map(y -> y.position_bounds, x) |>
