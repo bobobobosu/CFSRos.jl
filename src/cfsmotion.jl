@@ -5,6 +5,7 @@ using CFSTrajOpt.RigidBodyDynamics
 using CFSTrajOpt.Rotations
 using CFSTrajOpt: t3d2posang, t3d2allposang, t3d2posxdir, t3d2posydir, t3d2poszdir, velocityidx, packvecs, set_velocities!, set_configurations!, configidx
 using CFSTrajOpt: cfstrajkinsetup!, cfstrajdynsetup!, cfstrajkinodynsetup!, cfschecktrajj, update_ys!, update_d0s_dgrads!
+using CFSTrajOpt.SparseArrays
 using CFSTrajOpt: Trajectory
 using CFSTrajOpt.TimerOutputs
 using CFSTrajOpt: to
@@ -30,6 +31,10 @@ function validate_motion(
             :cart => vios[:cart] |> sum,
             :dyn => vios[:dyn] |> sum,
             :coll => vios[:coll] |> sum,
+            :violation_joints => vios[:violation_joints],
+            :violation_carts => vios[:violation_carts],
+            :violation_dyns => vios[:violation_dyns],
+            :violation_colls => vios[:violation_colls]
         )
     end
     function bestfilter(
@@ -138,8 +143,8 @@ function solve_cfsmotion(
     # kinematics optimization
     begin
         objective_val, objective_val_new = nothing, nothing
-        Δdg = 1.0e-3
-        Δdq = fill(1.0e-3, lastindex(trjy.cs))
+        Δdg = 1.0e-2
+        Δdq = fill(1.0e-2, lastindex(trjy.cs))
         for iter in 1:50
             m = Model(() -> Clarabel.Optimizer())
             set_optimizer_attribute(m, "tol_gap_abs", 1.0e-9)
@@ -189,11 +194,8 @@ function solve_cfsmotion(
             end
             @timeit to "optimize! kin" optimize!(m)
 
-            if !JuMP.is_solved_and_feasible(m)
-                trajs_fail = trajs_view
-                objective_val_new = nothing
-                @warn "kinematics solve failed"
-                # return (trajs_fail, sched)
+            if !JuMP.is_solved_and_feasible(m, allow_local=true, allow_almost=true)
+                throw("kinematics solve failed")
             end
 
             println("cartobj: ", value(cartobj))
@@ -210,8 +212,8 @@ function solve_cfsmotion(
 
             begin
                 # update model
-                Δdq .= update_tr(Δdq, dq_ρ; bounds=(1.0e-3, 1.0e1))
-                Δdg = update_tr(Δdg, minimum(reduce(min, dg_ρ)); bounds=(1.0e-3, 1.0e1))
+                Δdq .= update_tr(Δdq, dq_ρ; bounds=(1.0e-3, 1.0e-1))
+                Δdg = update_tr(Δdg, minimum(reduce(min, dg_ρ)); bounds=(1.0e-3, 1.0e-1))
 
                 trjy.cs .= map(x -> let
                         c = trjy.cs[x] |> collect
@@ -224,10 +226,13 @@ function solve_cfsmotion(
             best, bestvio, thisvio = validatef(trjy, best, bestvio)
 
             # Early termination
-            if !isnothing(objective_val) && objective_val_new > objective_val - 1.0e-4
-                break
-            else
-                objective_val = objective_val_new
+            if (thisvio[:coll] + thisvio[:cart]) == 0
+                if !isnothing(objective_val) &&
+                    abs(objective_val - objective_val_new) < 1.0e-2
+                    break
+                else
+                    objective_val = objective_val_new
+                end
             end
         end
     end
@@ -237,8 +242,8 @@ function solve_cfsmotion(
     begin
         println("dynamics optimization")
         objective_val, objective_val_new = nothing, nothing
-        Δdt = fill(1.0e-3, lastindex(diff(trjy.ts)))
-        for iter in 1:20
+        Δdt = fill(1.0e-2, lastindex(diff(trjy.ts)))
+        for iter in 1:40
             m = Model(() -> Clarabel.Optimizer())
             set_optimizer_attribute(m, "tol_gap_abs", 1.0e-9)
             set_optimizer_attribute(m, "tol_gap_rel", 1.0e-9)
@@ -280,10 +285,8 @@ function solve_cfsmotion(
 
             @timeit to "optimize! dyn" optimize!(m)
             println(objective_value(m))
-            if !JuMP.is_solved_and_feasible(m)
-                objective_val_new = objective_val
-                @warn "dynamics solve failed"
-                # return (trajs_fail, sched)
+            if !JuMP.is_solved_and_feasible(m, allow_local=true, allow_almost=true)
+                throw("dynamics solve failed")
             end
             dts_result = value.(dt)
             println("durationobj: ", value(durationobj))
@@ -292,6 +295,7 @@ function solve_cfsmotion(
 
             # update trajs
             trjy.ts .= cumsum([0.0; dts_result])
+            _, _, thisvio = validatef(trjy, best, bestvio)
             @timeit to "update ys" update_ys!(trjy)
             # update model
             @timeit to "collect update funcs" apply_func = update_func()
@@ -300,13 +304,13 @@ function solve_cfsmotion(
             # update trust region
             Δdt .= update_tr(Δdt, dt_ρ; bounds=(1.0e-3, 1.0e1))
 
+
             # update model and resolve
             objective_val_update = -1.0e6
             @timeit to "incremental solve dyn" for _ in 1:20
                 @timeit to "optimize! incremental dyn" optimize!(m)
                 termination_status(m) |> println
-                if !JuMP.is_solved_and_feasible(m)
-                    objective_val_new = objective_val
+                if !JuMP.is_solved_and_feasible(m, allow_local=true, allow_almost=true)
                     break
                 end
                 dts_result = value.(dt)
@@ -316,7 +320,12 @@ function solve_cfsmotion(
                 println("objective_val_update: ", objective_val_update)
                 # update trajs
                 trjy.ts .= cumsum([0.0; dts_result])
-                objective_val_new = objective_value(m)
+                _, _, thisvio_ = validatef(trjy, best, bestvio)
+                if thisvio_[:dyn] >= thisvio[:dyn]
+                    break
+                else
+                    thisvio = thisvio_
+                end
                 if abs(objective_value(m) - objective_val_update) > 1.0e-4
                     objective_val_update = objective_value(m)
                 else
@@ -331,10 +340,14 @@ function solve_cfsmotion(
             best, bestvio, thisvio = validatef(trjy, best, bestvio)
 
             # Early termination
-            if !isnothing(objective_val) && objective_val_new > objective_val - 1.0e-4
-                break
-            else
-                objective_val = objective_val_new
+            objective_val_new = sum(dts_result)
+            if thisvio[:dyn] == 0
+                if !isnothing(objective_val) &&
+                   abs(objective_val - objective_val_new) < 1.0e-1
+                    break
+                else
+                    objective_val = objective_val_new
+                end
             end
         end
     end
