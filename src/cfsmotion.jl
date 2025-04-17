@@ -98,7 +98,9 @@ end
 
 
 function solve_cfsmotion(
-    trjy::Trajectory
+    trjy::Trajectory,
+    kinematics_iter::Int=50,
+    dynamics_iter::Int=40
 )
     function kinvars(m::Model, trjy::Trajectory)
         g = @variable(m, [1:lastindex(trjy.gidx)])
@@ -145,7 +147,7 @@ function solve_cfsmotion(
         objective_val, objective_val_new = nothing, nothing
         Δdg = 1.0e-2
         Δdq = fill(1.0e-2, lastindex(trjy.cs))
-        for iter in 1:50
+        for iter in 1:kinematics_iter
             m = Model(() -> Clarabel.Optimizer())
             set_optimizer_attribute(m, "tol_gap_abs", 1.0e-9)
             set_optimizer_attribute(m, "tol_gap_rel", 1.0e-9)
@@ -243,7 +245,7 @@ function solve_cfsmotion(
         println("dynamics optimization")
         objective_val, objective_val_new = nothing, nothing
         Δdt = fill(1.0e-2, lastindex(diff(trjy.ts)))
-        for iter in 1:40
+        for iter in 1:dynamics_iter
             m = Model(() -> Clarabel.Optimizer())
             set_optimizer_attribute(m, "tol_gap_abs", 1.0e-9)
             set_optimizer_attribute(m, "tol_gap_rel", 1.0e-9)
