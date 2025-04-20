@@ -342,15 +342,15 @@ function solve_cfsmotion(
             best, bestvio, thisvio = validatef(trjy, best, bestvio)
 
             # Early termination
-            objective_val_new = sum(dts_result)
-            if thisvio[:dyn] == 0
-                if !isnothing(objective_val) &&
-                   abs(objective_val - objective_val_new) < 1.0e-1
-                    break
-                else
-                    objective_val = objective_val_new
-                end
-            end
+            # objective_val_new = sum(dts_result)
+            # if thisvio[:dyn] == 0
+            #     if !isnothing(objective_val) &&
+            #        abs(objective_val - objective_val_new) < 1.0e-1
+            #         break
+            #     else
+            #         objective_val = objective_val_new
+            #     end
+            # end
         end
     end
     trjy = best
