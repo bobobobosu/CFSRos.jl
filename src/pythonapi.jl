@@ -360,7 +360,7 @@ function plan_motion_cart_abs(
     global trjy_gbl = trjy
 
     if length(trajj) > 2
-        trjy = solve_cfsmotion(trjy, 50, 0)
+        trjy = solve_cfsmotion(trjy, 50, 40)
     end
 
     ts = trjy.ts
