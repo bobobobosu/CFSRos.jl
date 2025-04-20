@@ -244,7 +244,7 @@ function solve_cfsmotion(
     begin
         println("dynamics optimization")
         objective_val, objective_val_new = nothing, nothing
-        Δdt = fill(1.0e-2, lastindex(diff(trjy.ts)))
+        Δdt = fill(1.0e1, lastindex(diff(trjy.ts)))
         for iter in 1:40
             m = Model(() -> Clarabel.Optimizer())
             set_optimizer_attribute(m, "tol_gap_abs", 1.0e-9)
