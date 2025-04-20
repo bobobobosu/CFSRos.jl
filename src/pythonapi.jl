@@ -332,7 +332,7 @@ function plan_motion_cart_abs(
     ts = let
         vel_limit = dyn_constr[2] .|> x -> minimum(abs.(x))
         dts = diff(trajj) .|> x -> max(1.0e-3, maximum(abs.(x[qidx]) ./ vel_limit))
-        range(0.0, max(10.0, sum(dts)), length=length(trajj)) |> collect
+        range(0.0, max(60.0, sum(dts)), length=length(trajj)) |> collect
     end
     target_fs = let
         target_fs = Vector{Union{Nothing,Tuple{Transform3D{T},Symbol}}}(nothing, length(trajj))
