@@ -10,6 +10,7 @@ using CFSTrajOpt.Serialization
 
 function plan_motion_joint(
     setup::RobotSetup,
+    caches::RobotCaches,
     start_joint_names,
     start_joint_positions,
     goal_joint_names,
@@ -33,13 +34,13 @@ function plan_motion_joint(
         (x -> x.name).(setup.dof_joints)
     )
     c_start = robot_get_state(setup,
-        zeros(0),
-        q_start
-    ) |> configuration |> x -> SVector(x...)
+                  zeros(0),
+                  q_start
+              ) |> configuration |> x -> SVector(x...)
     c_goal = robot_get_state(setup,
-        zeros(0),
-        q_goal
-    ) |> configuration |> x -> SVector(x...)
+                 zeros(0),
+                 q_goal
+             ) |> configuration |> x -> SVector(x...)
 
     caches = RobotCaches(
         [RigidBodyCaches(setup.model) for _ in 1:Threads.nthreads()],
@@ -80,19 +81,19 @@ function plan_motion_joint(
     target_cs[end] = c_goal
     safety_margins = Vector{Union{Nothing,eltype(ts)}}(fill(safety_margin, length(trajj)))
 
-    trjy = Trajectory(
+    @time trjy = Trajectory(
         setup.model,
         setup.dof_layouts,
         setup.dof_joints,
         setup.collision_pairs,
         setup.dyn_constr,
         setup.meshgraphs_cvx,
+        caches,
         ts,
         trajj,
         target_fs,
         target_cs,
         safety_margins,
-        CPU()
     )
     global trjy_gbl = trjy
 
@@ -112,145 +113,6 @@ function plan_motion_joint(
 end
 
 
-function plan_motion_cart_rel(
-    setup::RobotSetup,
-    start_joint_names,
-    start_joint_positions,
-    frame_id,
-    goal_link_name,
-    goal_pos,
-    goal_ori,
-)
-    serialize(
-        "plan_motion_cart.jld2",
-        Dict(
-            "start_joint_names" => String.(start_joint_names),
-            "start_joint_positions" => Float64.(start_joint_positions),
-            "frame_id" => String(frame_id),
-            "goal_link_name" => String(goal_link_name),
-            "goal_pos" => Float64.(goal_pos),
-            "goal_ori" => Float64.(goal_ori)
-        )
-    )
-    q = map(x ->
-            start_joint_positions[findfirst(==(String(x)), start_joint_names)],
-        (x -> x.name).(setup.dof_joints)
-    )
-    c = robot_get_state(setup,
-        zeros(0),
-        q
-    ) |> configuration |> x -> SVector(x...)
-
-    target_f = (relative_transform(
-            s,
-            default_frame(findbody(setup.model, goal_link_name)),
-            default_frame(findbody(setup.model, frame_id))
-        ) * Transform3D(
-            default_frame(findbody(setup.model, goal_link_name)),
-            default_frame(findbody(setup.model, goal_link_name)),
-            QuatRotation(goal_ori...),
-            SVector(goal_pos...)
-        ), :t3d2posang)
-
-    caches = RobotCaches(
-        [RigidBodyCaches(setup.model) for _ in 1:Threads.nthreads()],
-        MeshGraphCaches(setup.meshgraphs_cvx, CPU())
-    )
-    dof = setup.dof_joints
-    meshgraphs = setup.meshgraphs_cvx
-    collision_pairs = setup.collision_pairs
-    dyn_constr = setup.dyn_constr
-    safety_margin = 0.03
-
-    N = length(c)
-    T = eltype(c)
-
-    pthcart = rrtcfscart(
-        caches,
-        dof,
-        c,
-        target_f,
-        meshgraphs,
-        collision_pairs,
-        dyn_constr,
-        safety_margin,
-        1.0,
-        1.0e-3,
-        4000
-    )
-
-    # upsample
-    upsample_tasks = Vector{NTuple{2,SVector{N,T}}}()
-    for i in 2:lastindex(pthcart)
-        push!(upsample_tasks, (pthcart[i-1], pthcart[i]))
-    end
-
-    upsample_pths = Vector{Vector{SVector{N,T}}}(undef, length(upsample_tasks))
-    for i in 1:lastindex(upsample_tasks)
-        upsample_pths[i] = rrtcfsjoint(
-            caches,
-            dof,
-            first(upsample_tasks[i]),
-            last(upsample_tasks[i]),
-            meshgraphs,
-            collision_pairs,
-            dyn_constr,
-            safety_margin,
-            0.1,
-            1.0e-4,
-            4000
-        )
-    end
-
-    qidx = configidx(setup.model, setup.dof_joints)
-    trajj = let
-        trajj = [pthcart[1]]
-        map(x -> append!(trajj, x[2:end]), upsample_pths)
-        trajj
-    end
-    ts = let
-        vel_limit = dyn_constr[2] .|> x -> minimum(abs.(x))
-        dts = diff(trajj) .|> x -> max(1.0e-3, maximum(abs.(x[qidx]) ./ vel_limit))
-        range(0.0, sum(dts), length=length(trajj)) |> collect
-    end
-    target_fs = let
-        target_fs = Vector{Union{Nothing,Tuple{Transform3D{T},Symbol}}}(nothing, length(trajj))
-        target_fs[end] = target_f
-        target_fs
-    end
-    target_cs = Vector{Union{Nothing,eltype(trajj)}}(nothing, length(trajj))
-    target_cs[1] = c
-    safety_margins = Vector{Union{Nothing,eltype(ts)}}(fill(safety_margin, length(trajj)))
-
-    trjy = Trajectory(
-        setup.model,
-        setup.dof_layouts,
-        setup.dof_joints,
-        setup.collision_pairs,
-        setup.dyn_constr,
-        setup.meshgraphs_cvx,
-        ts,
-        trajj,
-        target_fs,
-        target_cs,
-        safety_margins,
-        CPU()
-    )
-
-    if length(trajj) > 2
-        trjy = solve_cfsmotion(trjy)
-    end
-
-    global trjy_gbl = trjy
-    ts = trjy.ts
-    trajj = let
-        ros_joints = (x -> findjoint(setup.model, String(x))).(start_joint_names)
-        qidx = configidx(setup.model, ros_joints)
-        reduce(hcat, (x -> x[qidx]).(trajj))
-    end
-    ts, trajj
-end
-
 function plan_motion_cart_abs(
     setup::RobotSetup,
     caches::RobotCaches,
@@ -267,9 +129,9 @@ function plan_motion_cart_abs(
         (x -> x.name).(setup.dof_joints)
     )
     c = robot_get_state(setup,
-        zeros(0),
-        q
-    ) |> configuration |> x -> SVector(x...)
+            zeros(0),
+            q
+        ) |> configuration |> x -> SVector(x...)
 
     target_f = (Transform3D(
             default_frame(findbody(setup.model, goal_link_name)),
