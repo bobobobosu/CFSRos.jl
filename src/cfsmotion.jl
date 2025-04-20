@@ -344,7 +344,6 @@ function solve_cfsmotion(
             # Early termination
             objective_val_new = sum(dts_result)
             if thisvio[:dyn] == 0
-                break
                 if !isnothing(objective_val) &&
                    abs(objective_val - objective_val_new) < 1.0e-1
                     break
