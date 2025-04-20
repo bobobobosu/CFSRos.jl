@@ -42,10 +42,6 @@ function plan_motion_joint(
                  q_goal
              ) |> configuration |> x -> SVector(x...)
 
-    caches = RobotCaches(
-        [RigidBodyCaches(setup.model) for _ in 1:Threads.nthreads()],
-        MeshGraphCaches(setup.meshgraphs_cvx, CPU())
-    )
     dof = setup.dof_joints
     meshgraphs = setup.meshgraphs_cvx
     collision_pairs = setup.collision_pairs
